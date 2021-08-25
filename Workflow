@@ -1,0 +1,163 @@
+#coding:utf-8
+import win32com.client as win32
+import openpyxl
+from colorama import Fore, Back, Style
+import pandas as pd
+import numpy as np
+from bs4 import BeautifulSoup
+import lxml
+import re,random
+import requests
+import datetime
+from time import sleep
+import os, sys
+import multiprocessing as mul
+from urllib.parse import urlencode
+def getmakerPage(url_a):
+    #url = 'https://www.marklines.com/cn/global/maker-list'
+    headers = {
+
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.101 Safari/537.36 Edg/91.0.864.48',
+        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+        'cookie': '_ga=GA1.2.1287695386.1622174364; HMF_CI=58352c02e8c2e1f72bc0b03c122ea465dd64494ab762b06df5c450c780b9c0ca70; XSRF-TOKEN=bcc0d594ef61c578171511b610651b4010bfb318-1629259186659-sVJvH4N9Fr9nuTBr3BCTA5Jo; PLAY_LANG=cn; _gid=GA1.2.886251381.1629259188; PLATFORM_SESSION=533c1983a4e276cf0801054e3c86de810d323899-csrfToken=bcc0d594ef61c578171511b610651b4010bfb318-1629259186659-sVJvH4N9Fr9nuTBr3BCTA5Jo&_lsi=1915147&_ldi=820335&_lsh=602e1a6f0dcef5c17a6722600c5548218c7ba5e0; _plh=5e46ef8ff2d1297cc88504f9d9fdea4e676d8b62; _plh_notime=602e1a6f0dcef5c17a6722600c5548218c7ba5e0; _gat=1'
+    }
+    try:
+        r = requests.get(url_a,headers = headers)
+        #print('check1')
+        #if r.status_code == 200:
+            #r.encoding = r.apparent_encoding#此处将编码改成网页的编码样式，防止出现乱码
+        soup = BeautifulSoup(r.text, "lxml")
+        return soup
+    except:
+        print("爬取失败！")
+
+
+#####################################################################################################
+def get_detail_info(url):
+    #print(url)
+    cap_detail=[]
+    ftyinfo=['','','','']   #sleep(random.random() * 8)
+    cap_page=getmakerPage(url)
+    ftyinfo[0]=cap_page.find_all('div',{'class':"box-content"},limit=1)[0].find_all('div',limit=1)[0].text
+    profile_data=cap_page.find_all('div',{'class':"profile-area"})
+        
+    ftyinfo[1]=profile_data[0]
+    ftyinfo[3]=url
+    
+        
+    for ii in profile_data:
+        if re.search(r'/年',str(ii.text),re.I):
+            cap_detail.append(ii.text)
+    ftyinfo[2]=cap_detail
+    return ftyinfo
+
+
+def data_clean(t_data):
+    f_data=[]
+    l_data=[]
+
+    item_count=0
+    for item_i in t_data:
+        
+        item_count=item_count+1
+        sys.stdout.write('downloading {0:.2f}%'.format(item_count*100/len(tempdata))+'\r')
+        sys.stdout.flush()
+        item_i=item_i.replace(r'"makerName','')
+        item_i=item_i.replace(r',"nationName','')
+        item_i=item_i.replace(r',"factoryName','')
+        item_i=item_i.replace(r',"baseCategoryName','')
+        item_i=item_i.replace(r',"modelName','')
+
+        item_data_container=item_i.split(r'":"')
+        s1=item_data_container[3].find(r'">')+2
+        s2=len(item_data_container[3])-5
+        item_data_container.append('https://www.marklines.com'+item_data_container[3][9:s1-2])
+        l_data.append('https://www.marklines.com'+item_data_container[3][9:s1-2])
+        item_data_container[3]=item_data_container[3][s1:s2]
+        for data_i in range(7):
+            item_data_container[data_i]=item_data_container[data_i].replace(r'"','')
+            item_data_container[data_i]=item_data_container[data_i].replace(r'\r','')
+            item_data_container[data_i]=item_data_container[data_i].replace(r'\n','')
+            
+        item_data_container.insert(4,'NA')
+        item_data_container.insert(5,'NA')
+        
+        item_data_container.insert(6,'NA')
+        item_data_container[0]=item_count
+        f_data.append(item_data_container)
+        
+    return f_data,l_data
+if __name__=='__main__':
+
+    base_url = 'https://www.marklines.com/cn/global/search_list_data'
+    print('抓取开始')
+    program_start_time = datetime.datetime.now()
+
+    #test_url='https://www.marklines.com/cn/global/search_list_data'
+                #'https://www.marklines.com//cn/global/search_list?carMakers[229]=229&submit='
+    #test_url1='https://www.marklines.com/cn/global/search_list_data?carMakers[244]=244&submit=&_=1628440791104'
+    base_page=getmakerPage(base_url)
+    base=str(base_page)[25:len(str(base_page))-21]
+    #print('数据清洗开始。。。')
+    #base=base.replace(r'"makerName','')
+    #base=base.replace(r',"nationName','')
+    #base=base.replace(r',"factoryName','')
+    #base=base.replace(r',"baseCategoryName','')
+    #base=base.replace(r',"modelName','')
+    #print('数据清洗完成！')
+    #print('数据下载开始。。。')
+    dataheader=['No#','OEM','Nation','Factory','Name','Address','Capacity','Type','Model','Link']
+    tempdata=base.split(r'},{')
+    print('done')
+    
+    buffer=data_clean(tempdata)
+    datalist=buffer[0]
+    links=buffer[1]
+
+    links1=links[0:200]
+    links2=links[200:400]
+    links3=links[400:600]
+    links4=links[600:800]
+    links5=links[800:1000]
+    links6=links[1000:1200]
+    links7=links[1200:1400]
+    links8=links[1400:1600]
+    links9=links[1600:1800]
+    links10=links[1800:2000]
+    links11=links[2000:2085]
+    
+    
+
+    
+        #print(len(item_data_container))
+    #pd_data = pd.DataFrame(datalist, columns = dataheader)
+    #pd_filter=pd_data[(pd_data['Model']=='1.0L汽油发动机')]
+    #pd_filter=pd_data[['No#','Link']].loc[pd_data['Model'].str.contains('英朗')]
+    #print(pd_data[~(pd_data['Model']=='')])
+    #pd_data['Link'].loc[1]='test'
+    #pd_data.dropna()
+    #print(pd_data.at[1,'Model'])
+    #print(pd_data['Link'])
+    #pd_data.loc[0,'No#']='test'
+    #print(pd_filter.index)
+    
+    #for testii in pd_filter.index:
+        #print(testii)
+        #print(pd_filter.at[testii,'Link'])
+    #print(pd_data1)
+
+        #sys.stdout.write('downloading {0:.2f}%'.format(item_count*100/len(tempdata))+'\r')
+        #sys.stdout.flush()
+
+    #PD filter
+    #print(pd_data)
+
+    #writer = pd.ExcelWriter(r'C:\Temp\python\Test.xlsx', mode = 'w', engine = 'openpyxl')
+    #pd_data.to_excel(writer, index = False,  sheet_name='factory_LIST', header = dataheader,encoding = 'utf-8')
+    #writer.save()
+    #writer.close()
+    #print('数据下载完成！')
+    #print('抓取完成')
+
+    program_end_time = datetime.datetime.now()
+    print('总计运行时间: {}'.format(program_end_time - program_start_time))
